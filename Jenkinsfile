@@ -1,38 +1,47 @@
 pipeline {
     agent any
-    tools{
-        maven 'maven_3_5_0'
+    environment {
+        MAVEN_HOME = '/usr/share/maven'
+        PATH = "${MAVEN_HOME}/bin:${env.PATH}"
     }
-    stages{
-        stage('Build Maven'){
+    stages {
+        stage("checkout") {
             steps{
-                checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/Java-Techie-jt/devops-automation']]])
-                sh 'mvn clean install'
+                checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/sree8594/java-mavenapplication.git']])
             }
         }
-        stage('Build docker image'){
-            steps{
-                script{
-                    sh 'docker build -t javatechie/devops-integration .'
-                }
+        stage("validate the code") {
+            steps {
+                sh 'mvn validate'
             }
         }
-        stage('Push image to Hub'){
-            steps{
-                script{
-                   withCredentials([string(credentialsId: 'dockerhub-pwd', variable: 'dockerhubpwd')]) {
-                   sh 'docker login -u javatechie -p ${dockerhubpwd}'
-
-}
-                   sh 'docker push javatechie/devops-integration'
-                }
+        stage("compile the code") {
+            steps {
+                sh 'mvn compile'
             }
         }
-        stage('Deploy to k8s'){
-            steps{
-                script{
-                    kubernetesDeploy (configs: 'deploymentservice.yaml',kubeconfigId: 'k8sconfigpwd')
-                }
+        stage("test the code") {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage("package the code") {
+            steps {
+                sh 'mvn package'
+            }
+        }
+        stage("archieveArtifact") {
+            steps {
+                archiveArtifacts artifacts: 'target/*.jar', followSymlinks: false
+            }
+        }
+        stage("push to DockerHub") {
+            steps {
+                sh '''
+                        docker build /var/lib/jenkins/workspace/pipeline -t sreekanthreddyv/mavenapp:v1
+                        echo "Sreekanth@123" | docker login -u sreekanthreddyv --password-stdin
+                        docker push sreekanthreddyv/mavenapp:v1
+                '''
             }
         }
     }
