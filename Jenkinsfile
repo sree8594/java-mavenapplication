@@ -35,12 +35,30 @@ pipeline {
                 archiveArtifacts artifacts: 'target/*.jar', followSymlinks: false
             }
         }
+       stage("removing the old docker images") {
+            steps {
+                sh '''
+                        docker stop app1
+                        docker rm app1
+                        docker rmi sreekanthreddyv/mavenapp:v1
+                '''
+            }
+        }
         stage("push to DockerHub") {
             steps {
                 sh '''
                         docker build /var/lib/jenkins/workspace/pipeline -t sreekanthreddyv/mavenapp:v1
                         echo "Sreekanth@123" | docker login -u sreekanthreddyv --password-stdin
                         docker push sreekanthreddyv/mavenapp:v1
+                '''
+            }
+        }
+       stage("deploy into prod") {
+            steps {
+                sh '''
+                        docker rmi sreekanthreddyv/mavenapp:v1
+                        docker pull sreekanthreddyv/mavenapp:v1
+                        docker run -d --name app1 -p 80:8080 sreekanthreddyv/mavenapp:v1
                 '''
             }
         }
